@@ -8,6 +8,7 @@ on:
       - '**.tf'
       - 'modules/**'
       - 'environments/**'
+      - '.github/workflows/**'
 
 env:
   TERRAFORM_VERSION: '1.9.0'
