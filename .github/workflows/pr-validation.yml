@@ -3,7 +3,11 @@ name: Pull Request Validation
 on:
   pull_request:
     branches: [main]
-  workflow_dispatch:
+    paths:
+      - '**.hcl'
+      - '**.tf'
+      - 'modules/**'
+      - 'environments/**'
 
 env:
   TERRAFORM_VERSION: '1.9.0'
@@ -71,14 +75,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
-          terraform_wrapper: false
 
       - name: Setup Terragrunt
         run: |
@@ -95,93 +96,27 @@ jobs:
       - name: Get changed projects
         id: changed
         run: |
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "environments/" | cut -d'/' -f1-3 | sort -u || echo "")
-          echo "projects<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGED" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "environments/" | xargs -I {} dirname {} | sort -u || echo "")
+          echo "projects=$CHANGED" >> $GITHUB_OUTPUT
 
       - name: Terragrunt Plan
-        id: plan
         if: steps.changed.outputs.projects != ''
         run: |
-          PLAN_OUTPUT=""
-          
-          while IFS= read -r project; do
-            if [ -n "$project" ]; then
-              echo "::group::Planning $project"
-              cd "$GITHUB_WORKSPACE/$project"
-              
-              # Capture plan output
-              PLAN=$(terragrunt plan -lock=false -no-color 2>&1 || true)
-              
-              # Append to output
-              PLAN_OUTPUT+="<details><summary>📋 Plan for \`$project\`</summary>
-
-\`\`\`terraform
-$PLAN
-\`\`\`
-
-</details>
-
-"
-              echo "::endgroup::"
-              cd "$GITHUB_WORKSPACE"
-            fi
-          done <<< "${{ steps.changed.outputs.projects }}"
-          
-          # Save to file for PR comment
-          echo "$PLAN_OUTPUT" > plan_output.txt
-          
-          # Also output for debugging
-          echo "### Terragrunt Plans" >> $GITHUB_STEP_SUMMARY
-          echo "$PLAN_OUTPUT" >> $GITHUB_STEP_SUMMARY
+          for project in ${{ steps.changed.outputs.projects }}; do
+            echo "Planning $project"
+            cd $project
+            terragrunt plan -lock=false
+            cd -
+          done
 
       - name: Comment PR
         uses: actions/github-script@v7
         if: steps.changed.outputs.projects != ''
         with:
           script: |
-            const fs = require('fs');
-            const planOutput = fs.readFileSync('plan_output.txt', 'utf8');
-            
-            const output = `## 🏗️ Terragrunt Plan Results
-            
-**Triggered by:** @${{ github.actor }}
-**Branch:** \`${{ github.head_ref }}\`
-
-${planOutput}
-
----
-<sub>📝 Plan generated for PR #${{ github.event.pull_request.number }}</sub>`;
-
-            const { data: comments } = await github.rest.issues.listComments({
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const botComment = comments.find(comment => 
-              comment.user.type === 'Bot' && 
-              comment.body.includes('🏗️ Terragrunt Plan Results')
-            );
-
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: output
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: output
-              });
-            }
-
-      - name: No Changes Detected
-        if: steps.changed.outputs.projects == ''
-        run: |
-          echo "::notice::No infrastructure changes detected in this PR"
+              body: '✅ Terragrunt plan completed successfully! Review the logs above.'
+            })
