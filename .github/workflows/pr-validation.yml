@@ -2,14 +2,7 @@ name: Pull Request Validation
 
 on:
   pull_request:
-    branches: 
-      - main
-    paths:
-      - '**.hcl'
-      - '**.tf'
-      - 'modules/**'
-      - 'environments/**'
-      - '.github/workflows/**'
+    branches: [main]
 
 env:
   TERRAFORM_VERSION: '1.9.0'
