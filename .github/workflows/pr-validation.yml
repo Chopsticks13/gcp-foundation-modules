@@ -1,0 +1,192 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**.hcl'
+      - '**.tf'
+      - 'modules/**'
+      - 'environments/**'
+      - '.github/workflows/**'
+
+env:
+  TERRAFORM_VERSION: '1.9.0'
+  TERRAGRUNT_VERSION: '0.90.0'
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  validate:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Setup Terragrunt
+        run: |
+          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TERRAGRUNT_VERSION }}/terragrunt_linux_amd64
+          chmod +x terragrunt_linux_amd64
+          sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Validate Modules
+        run: |
+          cd modules/gcp-project
+          terraform init -backend=false
+          terraform validate
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          soft_fail: true
+
+      - name: Check for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+
+  plan:
+    name: Terragrunt Plan
+    runs-on: ubuntu-latest
+    needs: [validate, security]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TERRAGRUNT_VERSION }}/terragrunt_linux_amd64
+          chmod +x terragrunt_linux_amd64
+          sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Get changed projects
+        id: changed
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "environments/" | cut -d'/' -f1-3 | sort -u || echo "")
+          echo "projects<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Terragrunt Plan
+        id: plan
+        if: steps.changed.outputs.projects != ''
+        run: |
+          PLAN_OUTPUT=""
+          
+          while IFS= read -r project; do
+            if [ -n "$project" ]; then
+              echo "::group::Planning $project"
+              cd "$GITHUB_WORKSPACE/$project"
+              
+              # Capture plan output
+              PLAN=$(terragrunt plan -lock=false -no-color 2>&1 || true)
+              
+              # Append to output
+              PLAN_OUTPUT+="<details><summary>📋 Plan for \`$project\`</summary>
+
+\`\`\`terraform
+$PLAN
+\`\`\`
+
+</details>
+
+"
+              echo "::endgroup::"
+              cd "$GITHUB_WORKSPACE"
+            fi
+          done <<< "${{ steps.changed.outputs.projects }}"
+          
+          # Save to file for PR comment
+          echo "$PLAN_OUTPUT" > plan_output.txt
+          
+          # Also output for debugging
+          echo "### Terragrunt Plans" >> $GITHUB_STEP_SUMMARY
+          echo "$PLAN_OUTPUT" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment PR
+        uses: actions/github-script@v7
+        if: steps.changed.outputs.projects != ''
+        with:
+          script: |
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('plan_output.txt', 'utf8');
+            
+            const output = `## 🏗️ Terragrunt Plan Results
+            
+**Triggered by:** @${{ github.actor }}
+**Branch:** \`${{ github.head_ref }}\`
+
+${planOutput}
+
+---
+<sub>📝 Plan generated for PR #${{ github.event.pull_request.number }}</sub>`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('🏗️ Terragrunt Plan Results')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: output
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: output
+              });
+            }
+
+      - name: No Changes Detected
+        if: steps.changed.outputs.projects == ''
+        run: |
+          echo "::notice::No infrastructure changes detected in this PR"
