@@ -1,5 +1,5 @@
 name: Pull Request Validation
-
+# Automated validation for pull requests
 on:
   pull_request:
     branches: [main]
