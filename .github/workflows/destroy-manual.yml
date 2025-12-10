@@ -1,0 +1,103 @@
+name: Manual Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to destroy from'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      project:
+        description: 'Project name (e.g., project-gcp-core)'
+        required: true
+        type: string
+      confirmation:
+        description: 'Type DELETE to confirm destruction'
+        required: true
+        type: string
+
+env:
+  TERRAFORM_VERSION: '1.9.0'
+  TERRAGRUNT_VERSION: '0.90.0'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  validate-confirmation:
+    name: Validate Destroy Confirmation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check confirmation word
+        run: |
+          if [ "${{ inputs.confirmation }}" != "DELETE" ]; then
+            echo "❌ Confirmation failed. You must type DELETE (uppercase) to confirm destruction."
+            exit 1
+          fi
+          echo "✅ Confirmation validated"
+
+  destroy:
+    name: Destroy Infrastructure
+    runs-on: ubuntu-latest
+    needs: validate-confirmation
+    environment: ${{ inputs.environment }}-destroy
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Setup Terragrunt
+        run: |
+          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TERRAGRUNT_VERSION }}/terragrunt_linux_amd64
+          chmod +x terragrunt_linux_amd64
+          sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Show what will be destroyed
+        run: |
+          cd environments/${{ inputs.environment }}/${{ inputs.project }}
+          echo "🔍 Resources that will be DESTROYED:"
+          terragrunt plan -destroy
+
+      - name: Wait for manual review
+        run: |
+          echo "⏳ Waiting 30 seconds for manual review..."
+          echo "⚠️  Last chance to cancel this workflow!"
+          sleep 30
+
+      - name: Destroy Infrastructure
+        run: |
+          cd environments/${{ inputs.environment }}/${{ inputs.project }}
+          echo "💥 DESTROYING: ${{ inputs.environment }}/${{ inputs.project }}"
+          terragrunt destroy -auto-approve
+
+      - name: Verify Destruction
+        run: |
+          echo "✅ Destruction completed for ${{ inputs.environment }}/${{ inputs.project }}"
+          echo "📋 Review the logs above to confirm all resources were destroyed"
+
+      - name: Post-destroy notification
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "🎉 Successfully destroyed ${{ inputs.environment }}/${{ inputs.project }}"
+          else
+            echo "❌ Destruction failed for ${{ inputs.environment }}/${{ inputs.project }}"
+            echo "⚠️  Manual cleanup may be required!"
+          fi

@@ -1,0 +1,10 @@
+# Default owner for all files
+* @Chopsticks13
+
+# Production environment requires extra scrutiny
+/environments/prod/ @Chopsticks13
+
+# Critical infrastructure files
+/modules/ @Chopsticks13
+/root.hcl @Chopsticks13
+/org.hcl @Chopsticks13

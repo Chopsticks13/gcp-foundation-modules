@@ -1,0 +1,209 @@
+name: New GCP Project Request
+description: Request a new GCP project to be created
+title: "[PROJECT]: "
+labels: ["project-request", "triage"]
+assignees:
+  - Chopsticks13
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## New GCP Project Request
+
+        Use this template to request a new GCP project. The platform team will review and provision it.
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Which environment should this project be created in?
+      options:
+        - dev
+        - staging
+        - prod
+        - sandbox
+    validations:
+      required: true
+
+  - type: input
+    id: project-id
+    attributes:
+      label: Proposed Project ID
+      description: Must be 6-30 characters, lowercase letters, numbers, hyphens
+      placeholder: "e.g., dev-my-service"
+    validations:
+      required: true
+
+  - type: input
+    id: project-name
+    attributes:
+      label: Project Name
+      description: Human-readable project name
+      placeholder: "e.g., My Service Project"
+    validations:
+      required: true
+
+  - type: input
+    id: team
+    attributes:
+      label: Team/Owner
+      description: Which team owns this project?
+      placeholder: "e.g., platform, data, backend"
+    validations:
+      required: true
+
+  - type: input
+    id: cost-center
+    attributes:
+      label: Cost Center
+      description: Cost center code for billing
+      placeholder: "e.g., CC-00001"
+    validations:
+      required: true
+
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Purpose/Description
+      description: What is this project for?
+      placeholder: Describe the purpose and use case for this project
+    validations:
+      required: true
+
+  - type: dropdown
+    id: apis-compute
+    attributes:
+      label: Enable Compute Engine API?
+      options:
+        - "Yes"
+        - "No"
+      default: 0
+
+  - type: dropdown
+    id: apis-gke
+    attributes:
+      label: Enable GKE API?
+      options:
+        - "Yes"
+        - "No"
+      default: 1
+
+  - type: dropdown
+    id: apis-cloudrun
+    attributes:
+      label: Enable Cloud Run API?
+      options:
+        - "Yes"
+        - "No"
+      default: 1
+
+  - type: dropdown
+    id: apis-cloudsql
+    attributes:
+      label: Enable Cloud SQL API?
+      options:
+        - "Yes"
+        - "No"
+      default: 1
+
+  - type: dropdown
+    id: apis-secrets
+    attributes:
+      label: Enable Secret Manager API?
+      options:
+        - "Yes"
+        - "No"
+      default: 0
+
+  - type: dropdown
+    id: apis-kms
+    attributes:
+      label: Enable Cloud KMS API?
+      options:
+        - "Yes"
+        - "No"
+      default: 1
+
+  - type: dropdown
+    id: apis-logging
+    attributes:
+      label: Enable Cloud Logging API?
+      options:
+        - "Yes"
+        - "No"
+      default: 0
+
+  - type: dropdown
+    id: apis-monitoring
+    attributes:
+      label: Enable Cloud Monitoring API?
+      options:
+        - "Yes"
+        - "No"
+      default: 0
+
+  - type: textarea
+    id: additional-apis
+    attributes:
+      label: Additional APIs
+      description: Any other GCP APIs needed?
+      placeholder: |
+        - pubsub.googleapis.com
+        - storage.googleapis.com
+    validations:
+      required: false
+
+  - type: textarea
+    id: iam-bindings
+    attributes:
+      label: IAM Bindings
+      description: Any specific IAM bindings required?
+      placeholder: |
+        - roles/viewer for user:someone@example.com
+        - roles/editor for group:team@example.com
+    validations:
+      required: false
+
+  - type: textarea
+    id: service-accounts
+    attributes:
+      label: Service Accounts
+      description: Service accounts needed for this project
+      placeholder: |
+        - Account ID: my-service-sa
+          Display Name: My Service Account
+          Description: Used for X purpose
+          Roles: roles/storage.objectViewer
+    validations:
+      required: false
+
+  - type: dropdown
+    id: org-policies
+    attributes:
+      label: Apply Default Organization Policies?
+      description: Enforce OS Login, skip default network, uniform bucket access
+      options:
+        - "Yes (Recommended)"
+        - "No"
+      default: 0
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other requirements or context
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have verified the project ID follows naming conventions
+          required: true
+        - label: I have confirmed budget/cost center approval
+          required: true
+        - label: I have identified the team/owner responsible for this project
+          required: true

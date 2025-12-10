@@ -4,6 +4,7 @@
 # .tfstate files
 *.tfstate
 *.tfstate.*
+*.tfstate.backup
 
 # Crash log files
 crash.log
@@ -35,3 +36,42 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+.terragrunt-cache/
+
+# Terragrunt logs
+terragrunt.log
+terragrunt-debug.log
+
+# Terraform lock files (commit these for production, optional for modules)
+# Uncomment if you want to commit lock files:
+# !.terraform.lock.hcl
+
+# Pre-commit
+.pre-commit-config-local.yaml
+
+# OS-specific
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.code-workspace
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# TFLint cache
+.tflint.d/
+
+# Local environment files
+.env
+.env.local
+*.local

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: General Question or Discussion
+    url: https://github.com/Chopsticks13/gcp-foundation-modules/discussions
+    about: Ask questions or discuss ideas with the community
+  - name: Security Vulnerability
+    url: https://github.com/Chopsticks13/gcp-foundation-modules/security/advisories/new
+    about: Report a security vulnerability privately
