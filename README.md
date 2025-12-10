@@ -12,3 +12,4 @@ terragrunt apply
 # Test change
 # Trigger
 # Another trigger
+# Test after settings change
