@@ -70,18 +70,6 @@ terraform {
   }
 }
 
-# Retry on transient errors
-retry {
-  retryable_errors = [
-    "(?s).*Error 403.*",
-    "(?s).*Error 429.*",
-    "(?s).*Error 50[0-9].*",
-    "(?s).*timeout.*",
-  ]
-  max_attempts       = 3
-  sleep_interval_sec = 5
-}
-
 # Common inputs available to all modules
 inputs = {
   organization_id = local.org_vars.locals.organization_id
