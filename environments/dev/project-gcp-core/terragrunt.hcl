@@ -13,8 +13,6 @@ locals {
   env_vars = read_terragrunt_config(find_in_parent_folders("env.hcl"))
   org_vars = read_terragrunt_config(find_in_parent_folders("org.hcl"))
   
-  # Get user email for IAM
-  user_email = run_cmd("--terragrunt-quiet", "gcloud", "config", "get-value", "account")
 }
 
 inputs = {
@@ -55,4 +53,4 @@ inputs = {
       roles        = []
     }
   }
-}# Test plan output
+}
