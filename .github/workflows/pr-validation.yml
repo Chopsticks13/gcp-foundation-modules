@@ -122,7 +122,7 @@ jobs:
           cd environments/${{ matrix.environment }}
           echo "## Plan for ${{ matrix.environment }}" > plan_output.txt
           echo "" >> plan_output.txt
-          terragrunt run-all plan --non-interactive -lock=false 2>&1 | tee -a plan_output.txt
+          terragrunt run-all plan --non-interactive -- -lock=false 2>&1 | tee -a plan_output.txt
 
       - name: Upload Plan Output
         uses: actions/upload-artifact@v4
