@@ -1,4 +1,4 @@
-name: Pull Request Validation
+name: PR Validation
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ on:
 
 env:
   TERRAFORM_VERSION: '1.9.0'
-  TERRAGRUNT_VERSION: '0.90.0'
+  TERRAGRUNT_VERSION: '0.94.0'
 
 permissions:
   contents: read
@@ -22,7 +22,6 @@ jobs:
   validate:
     name: Validate Configuration
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,6 +30,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
 
       - name: Setup Terragrunt
         run: |
@@ -43,14 +43,17 @@ jobs:
 
       - name: Validate Modules
         run: |
-          cd modules/gcp-project
-          terraform init -backend=false
-          terraform validate
+          for module in modules/*/; do
+            echo "Validating $module"
+            cd "$module"
+            terraform init -backend=false
+            terraform validate
+            cd - > /dev/null
+          done
 
   security:
     name: Security Scan
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -67,11 +70,30 @@ jobs:
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
 
-  plan:
-    name: Terragrunt Plan
+  discover:
+    name: Discover Environments
     runs-on: ubuntu-latest
-    needs: [validate, security]
-    
+    outputs:
+      environments: ${{ steps.find.outputs.environments }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find Environments
+        id: find
+        run: |
+          ENVS=$(find environments -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "environments=$ENVS" >> $GITHUB_OUTPUT
+          echo "Found environments: $ENVS"
+
+  plan:
+    name: Plan - ${{ matrix.environment }}
+    runs-on: ubuntu-latest
+    needs: [validate, security, discover]
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: ${{ fromJson(needs.discover.outputs.environments) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -80,6 +102,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
 
       - name: Setup Terragrunt
         run: |
@@ -93,30 +116,84 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Get changed projects
-        id: changed
+      - name: Terragrunt Plan - ${{ matrix.environment }}
+        id: plan
         run: |
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "environments/" | xargs -I {} dirname {} | sort -u || echo "")
-          echo "projects=$CHANGED" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          cd environments/${{ matrix.environment }}
+          echo "## Plan for ${{ matrix.environment }}" > plan_output.txt
+          echo "" >> plan_output.txt
+          terragrunt run --all plan --non-interactive -- -lock=false 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee -a plan_output.txt
 
-      - name: Terragrunt Plan
-        if: steps.changed.outputs.projects != ''
-        run: |
-          for project in ${{ steps.changed.outputs.projects }}; do
-            echo "Planning $project"
-            cd $project
-            terragrunt plan -lock=false
-            cd -
-          done
+      - name: Upload Plan Output
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-${{ matrix.environment }}
+          path: environments/${{ matrix.environment }}/plan_output.txt
 
-      - name: Comment PR
+  comment:
+    name: Comment PR
+    runs-on: ubuntu-latest
+    needs: [plan, discover]
+    if: always() && needs.discover.result == 'success' && needs.plan.result != 'skipped'
+    steps:
+      - name: Download All Plan Outputs
+        uses: actions/download-artifact@v4
+        with:
+          path: plans
+          pattern: plan-*
+          merge-multiple: false
+
+      - name: Combine and Comment
         uses: actions/github-script@v7
-        if: steps.changed.outputs.projects != ''
         with:
           script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            const plansDir = 'plans';
+            if (!fs.existsSync(plansDir) || fs.readdirSync(plansDir).length === 0) {
+              console.log('No plan outputs found, skipping comment');
+              return;
+            }
+            
+            const planStatus = '${{ needs.plan.result }}';
+            const statusEmoji = planStatus === 'success' ? '✅' : '❌';
+            
+            let body = `## ${statusEmoji} Terragrunt Plan Results\n\n`;
+            body += `**Status:** ${planStatus}\n\n`;
+            
+            const envDirs = fs.readdirSync(plansDir).sort();
+            for (const envDir of envDirs) {
+              const planFile = path.join(plansDir, envDir, 'plan_output.txt');
+              if (fs.existsSync(planFile)) {
+                let content = fs.readFileSync(planFile, 'utf8');
+                const envName = envDir.replace('plan-', '');
+                
+                // Extract just the plan portion (from "Terraform will perform" to end of plan)
+                const planMatch = content.match(/Terraform will perform the following actions:[\s\S]*Plan: \d+ to add[\s\S]*?(?=\n\n|$)/);
+                const planContent = planMatch ? planMatch[0] : content;
+                
+                const addMatch = content.match(/(\d+) to add/);
+                const changeMatch = content.match(/(\d+) to change/);
+                const destroyMatch = content.match(/(\d+) to destroy/);
+                
+                let summary = '';
+                if (addMatch || changeMatch || destroyMatch) {
+                  summary = ` (${addMatch?.[0] || '0 to add'}, ${changeMatch?.[0] || '0 to change'}, ${destroyMatch?.[0] || '0 to destroy'})`;
+                }
+                
+                const truncated = planContent.length > 60000 
+                  ? planContent.substring(0, 60000) + '\n\n... truncated ...' 
+                  : planContent;
+                
+                body += `<details>\n<summary><b>${envName}</b>${summary}</summary>\n\n\`\`\`hcl\n${truncated}\n\`\`\`\n</details>\n\n`;
+              }
+            }
+            
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '✅ Terragrunt plan completed successfully! Review the logs above.'
-            })
+              body: body
+            });

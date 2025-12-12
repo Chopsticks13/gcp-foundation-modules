@@ -13,8 +13,6 @@ locals {
   env_vars = read_terragrunt_config(find_in_parent_folders("env.hcl"))
   org_vars = read_terragrunt_config(find_in_parent_folders("org.hcl"))
   
-  # Get user email for IAM
-  user_email = run_cmd("--terragrunt-quiet", "gcloud", "config", "get-value", "account")
 }
 
 inputs = {
@@ -42,10 +40,8 @@ inputs = {
   enable_monitoring     = true
   enable_secret_manager = true
   
-  # IAM bindings - use real user email
-  iam_bindings = {
-    "roles/viewer" = "user:${local.user_email}"
-  }
+  # IAM bindings
+  iam_bindings = {}
   
   # Service accounts - better naming
   service_accounts = {
@@ -55,4 +51,4 @@ inputs = {
       roles        = []
     }
   }
-}# Test plan output
+}

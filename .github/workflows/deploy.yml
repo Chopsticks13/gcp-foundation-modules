@@ -1,0 +1,112 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'environments/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      project:
+        description: 'Specific project (leave empty for all in environment)'
+        required: false
+        type: string
+
+env:
+  TERRAFORM_VERSION: '1.9.0'
+  TERRAGRUNT_VERSION: '0.94.0'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  discover:
+    name: Discover Changes
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has_changes: ${{ steps.set-matrix.outputs.has_changes }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Determine what to deploy
+        id: set-matrix
+        run: |
+          set -euo pipefail
+          
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            ENV="${{ inputs.environment }}"
+            PROJECT="${{ inputs.project }}"
+            
+            if [ -n "$PROJECT" ]; then
+              MATRIX="[{\"environment\": \"$ENV\", \"project\": \"$PROJECT\"}]"
+            else
+              PROJECTS=$(find environments/$ENV -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | jq -R -s -c 'split("\n") | map(select(length > 0))')
+              MATRIX=$(echo "$PROJECTS" | jq -c --arg env "$ENV" '[.[] | {environment: $env, project: .}]')
+            fi
+          else
+            CHANGED=$(git diff --name-only HEAD^ HEAD | grep "^environments/" | cut -d'/' -f2,3 | sort -u | grep "/" || echo "")
+            
+            if [ -z "$CHANGED" ]; then
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+              echo "matrix=[]" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            
+            MATRIX=$(echo "$CHANGED" | jq -R -s -c 'split("\n") | map(select(length > 0)) | map(split("/") | {environment: .[0], project: .[1]})')
+          fi
+          
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "Deployment matrix: $MATRIX"
+
+  deploy:
+    name: Deploy ${{ matrix.environment }}/${{ matrix.project }}
+    needs: discover
+    if: needs.discover.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include: ${{ fromJson(needs.discover.outputs.matrix) }}
+    environment: ${{ matrix.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TERRAGRUNT_VERSION }}/terragrunt_linux_amd64
+          chmod +x terragrunt_linux_amd64
+          sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Deploy
+        run: |
+          cd environments/${{ matrix.environment }}/${{ matrix.project }}
+          echo "🚀 Deploying ${{ matrix.environment }}/${{ matrix.project }}"
+          terragrunt run --all apply --non-interactive -- -auto-approve
