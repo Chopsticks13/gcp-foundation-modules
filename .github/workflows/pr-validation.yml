@@ -119,6 +119,7 @@ jobs:
       - name: Terragrunt Plan - ${{ matrix.environment }}
         id: plan
         run: |
+          set -euo pipefail
           cd environments/${{ matrix.environment }}
           echo "## Plan for ${{ matrix.environment }}" > plan_output.txt
           echo "" >> plan_output.txt
