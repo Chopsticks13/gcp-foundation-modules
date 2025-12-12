@@ -27,7 +27,7 @@ inputs = {
   # Metadata
   environment = local.env_vars.locals.environment  # From env.hcl instead of hardcoded
   team        = "platform"
-  cost_center = "CC-00001"
+  cost_center = "cc-00001"
   
   # Additional labels
   labels = {
