@@ -40,10 +40,8 @@ inputs = {
   enable_monitoring     = true
   enable_secret_manager = true
   
-  # IAM bindings - use real user email
-  iam_bindings = {
-    "roles/viewer" = "user:${local.user_email}"
-  }
+  # IAM bindings
+  iam_bindings = {}
   
   # Service accounts - better naming
   service_accounts = {
