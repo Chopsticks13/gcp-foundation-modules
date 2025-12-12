@@ -123,7 +123,7 @@ jobs:
           cd environments/${{ matrix.environment }}
           echo "## Plan for ${{ matrix.environment }}" > plan_output.txt
           echo "" >> plan_output.txt
-          terragrunt run --all plan --non-interactive -- -lock=false 2>&1 | tee -a plan_output.txt
+          terragrunt run --all plan --non-interactive -- -lock=false 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee -a plan_output.txt
 
       - name: Upload Plan Output
         uses: actions/upload-artifact@v4
@@ -167,8 +167,12 @@ jobs:
             for (const envDir of envDirs) {
               const planFile = path.join(plansDir, envDir, 'plan_output.txt');
               if (fs.existsSync(planFile)) {
-                const content = fs.readFileSync(planFile, 'utf8');
+                let content = fs.readFileSync(planFile, 'utf8');
                 const envName = envDir.replace('plan-', '');
+                
+                // Extract just the plan portion (from "Terraform will perform" to end of plan)
+                const planMatch = content.match(/Terraform will perform the following actions:[\s\S]*Plan: \d+ to add[\s\S]*?(?=\n\n|$)/);
+                const planContent = planMatch ? planMatch[0] : content;
                 
                 const addMatch = content.match(/(\d+) to add/);
                 const changeMatch = content.match(/(\d+) to change/);
@@ -179,9 +183,9 @@ jobs:
                   summary = ` (${addMatch?.[0] || '0 to add'}, ${changeMatch?.[0] || '0 to change'}, ${destroyMatch?.[0] || '0 to destroy'})`;
                 }
                 
-                const truncated = content.length > 30000 
-                  ? content.substring(0, 30000) + '\n\n... truncated ...' 
-                  : content;
+                const truncated = planContent.length > 60000 
+                  ? planContent.substring(0, 60000) + '\n\n... truncated ...' 
+                  : planContent;
                 
                 body += `<details>\n<summary><b>${envName}</b>${summary}</summary>\n\n\`\`\`hcl\n${truncated}\n\`\`\`\n</details>\n\n`;
               }
