@@ -118,6 +118,7 @@ gcp-foundation-modules/
 
 | Doc | What it covers |
 |-----|---------------|
+| [Bootstrap](docs/BOOTSTRAP.md) | Chicken-and-egg problem, project structure, no-org decision |
 | [Branching](docs/BRANCHING.md) | Trunk-based dev, branch naming, deployment flow |
 | [CI Pipeline](docs/CI.md) | What each validation step does (tflint, checkov, etc.) |
 | [Naming](docs/NAMING.md) | Resource naming conventions with Google/Azure references |
