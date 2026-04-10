@@ -1,7 +1,53 @@
 # GCP Foundation Modules
 
-Reusable Terraform modules + Terragrunt compositions for GCP infrastructure.
-Follows [cloud-foundation-fabric](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric) design patterns.
+[![PR Validation](https://github.com/Chopsticks13/gcp-foundation-modules/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/Chopsticks13/gcp-foundation-modules/actions/workflows/pr-validation.yml)
+[![Terraform](https://img.shields.io/badge/terraform-%3E%3D1.9-blue?logo=terraform)](https://www.terraform.io/)
+[![Terragrunt](https://img.shields.io/badge/terragrunt-1.0-blue?logo=terragrunt)](https://terragrunt.gruntwork.io/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+Reusable Terraform modules + Terragrunt 1.0 stacks for GCP infrastructure.
+Inspired by [cloud-foundation-fabric](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric) design patterns.
+
+## Architecture
+
+```mermaid
+flowchart TD
+  subgraph bootstrap["Bootstrap (ops-admin-7x2)"]
+    wif["WIF: GitHub OIDC + SA"]
+    bucket["State: ops-tfstate-7x2"]
+  end
+
+  subgraph live["live/terragrunt.stack.hcl"]
+    direction TB
+    dev_proj["dev/project"]
+    dev_sa["dev/iam-service-account"]
+    dev_gcs["dev/gcs"]
+  end
+
+  subgraph modules["modules/"]
+    m_proj["project"]
+    m_sa["iam-service-account"]
+    m_gcs["gcs"]
+    m_wif["wif-github"]
+  end
+
+  wif --> m_wif
+  dev_proj --> m_proj
+  dev_sa --> m_sa
+  dev_gcs --> m_gcs
+  dev_sa -.->|depends on| dev_proj
+  dev_gcs -.->|depends on| dev_proj
+  bucket -.->|stores state for| live
+```
+
+## Modules
+
+| Module | Description | Docs |
+|--------|-------------|------|
+| [project](modules/project/) | GCP project, API enablement, IAM, org policies, Shared VPC | [variables](modules/project/variables.tf) |
+| [iam-service-account](modules/iam-service-account/) | Service account with IAM on/for the SA | [variables](modules/iam-service-account/variables.tf) |
+| [gcs](modules/gcs/) | GCS bucket with versioning, lifecycle, retention, CMEK | [variables](modules/gcs/variables.tf) |
+| [wif-github](modules/wif-github/) | Workload Identity Federation for GitHub Actions | [variables](modules/wif-github/variables.tf) |
 
 ## Getting Started
 
@@ -18,30 +64,26 @@ curl https://mise.jdx.dev/install.sh | sh
 ```bash
 git clone https://github.com/Chopsticks13/gcp-foundation-modules.git
 cd gcp-foundation-modules
-mise trust    # trust this repo's mise.toml
-mise install  # installs all tools at pinned versions
-pre-commit install  # set up git hooks
+mise trust && mise install
+pre-commit install
 ```
 
-## Architecture
+### Deploy
 
-```
-modules/    Pure Terraform modules (project, iam-service-account, gcs)
-    |
-units/      Terragrunt unit definitions (wrap each module, wire inputs)
-    |
-live/       Actual deployments (terragrunt.stack.hcl declares environments)
+```bash
+cd live
+terragrunt stack generate        # generate units from stack definition
+terragrunt stack run -- plan     # plan all units
+terragrunt stack run -- apply    # apply all units
 ```
 
-```mermaid
-flowchart TD
-  live["live/terragrunt.stack.hcl<br/>(dev, staging, prod)"]
-  live -->|values| up["units/project"]
-  live -->|values| usa["units/iam-service-account"]
-  live -->|values| ugcs["units/gcs"]
-  up -->|sources| mp["modules/project"]
-  usa -->|sources| msa["modules/iam-service-account"]
-  ugcs -->|sources| mgcs["modules/gcs"]
+### Useful Commands
+
+```bash
+terragrunt list                  # list all units
+terragrunt dag graph             # show dependency graph (pipe to dot for PNG)
+terragrunt stack output          # show outputs from all units
+terragrunt stack clean           # remove generated files
 ```
 
 ## Repository Structure
@@ -49,42 +91,40 @@ flowchart TD
 ```
 gcp-foundation-modules/
 ├── modules/                  # Layer 1: Pure Terraform modules
-│   ├── project/              #   GCP project, APIs, IAM, org policies
-│   ├── iam-service-account/  #   Service account, IAM on/for SA
-│   └── gcs/                  #   GCS bucket, lifecycle, IAM
+│   ├── project/
+│   ├── iam-service-account/
+│   ├── gcs/
+│   └── wif-github/
 ├── units/                    # Layer 2: Terragrunt unit definitions
 │   ├── project/
 │   ├── iam-service-account/
-│   └── gcs/
+│   ├── gcs/
+│   └── wif-github/
 ├── live/                     # Layer 3: Actual deployments
-│   └── terragrunt.stack.hcl  #   Declares dev (staging/prod added here)
+│   └── terragrunt.stack.hcl
+├── docs/                     # Documentation
+│   ├── BRANCHING.md          # Trunk-based development strategy
+│   ├── CI.md                 # CI/CD pipeline explained
+│   ├── NAMING.md             # Resource naming conventions
+│   └── WIF.md                # Workload Identity Federation setup
 ├── root.hcl                  # Remote state + provider generation
 ├── org.hcl                   # Org-wide config (billing, region)
 └── mise.toml                 # Tool version pinning
 ```
 
-## Modules
+## Documentation
 
-| Module | Description |
-|--------|-------------|
-| [project](modules/project/) | GCP project with API enablement, IAM, org policies, Shared VPC |
-| [iam-service-account](modules/iam-service-account/) | Service account with IAM bindings on/for the SA |
-| [gcs](modules/gcs/) | GCS bucket with versioning, lifecycle, retention, CMEK |
-
-## Branching Strategy
-
-Trunk-based development. See [docs/BRANCHING.md](docs/BRANCHING.md) for details.
-
-## Releases
-
-Semantic versioning with git tags:
-
-```hcl
-terraform {
-  source = "git::https://github.com/Chopsticks13/gcp-foundation-modules.git//modules/project?ref=v0.1.0"
-}
-```
+| Doc | What it covers |
+|-----|---------------|
+| [Branching](docs/BRANCHING.md) | Trunk-based dev, branch naming, deployment flow |
+| [CI Pipeline](docs/CI.md) | What each validation step does (tflint, checkov, etc.) |
+| [Naming](docs/NAMING.md) | Resource naming conventions with Google/Azure references |
+| [WIF](docs/WIF.md) | Workload Identity Federation setup and bootstrap |
 
 ## Tool Versions
 
-All tool versions are pinned in [mise.toml](mise.toml). Run `mise install` to get the exact versions used by CI.
+All versions pinned in [mise.toml](mise.toml). Run `mise install` to match CI exactly.
+
+## License
+
+[MIT](LICENSE)
