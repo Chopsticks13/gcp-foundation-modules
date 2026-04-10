@@ -34,7 +34,13 @@ body:
       label: Related Module
       description: Which module does this relate to?
       options:
-        - gcp-project
+        - project
+        - folder
+        - iam-service-account
+        - net-vpc
+        - net-vpc-firewall
+        - gcs
+        - artifact-registry
         - New Module
         - Multiple Modules
         - Not Module-Specific
