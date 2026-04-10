@@ -35,10 +35,13 @@ variable "sa_project_roles" {
   description = "IAM roles to grant the SA on the project."
   type        = list(string)
   default = [
-    "roles/serviceusage.serviceUsageAdmin",
+    "roles/billing.projectManager",
     "roles/iam.serviceAccountAdmin",
-    "roles/storage.admin",
+    "roles/iam.workloadIdentityPoolAdmin",
+    "roles/orgpolicy.policyAdmin",
     "roles/resourcemanager.projectCreator",
-    "roles/billing.user",
+    "roles/resourcemanager.projectIamAdmin",
+    "roles/serviceusage.serviceUsageAdmin",
+    "roles/storage.admin",
   ]
 }
