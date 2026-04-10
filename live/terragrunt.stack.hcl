@@ -1,6 +1,20 @@
 # Live deployments.
 # Each unit block declares a resource in an environment.
 
+# --- Bootstrap (ops-admin-7x2) ---
+
+unit "wif" {
+  source = "../units/wif-github"
+  path   = "bootstrap/wif-github"
+
+  values = {
+    github_org   = "Chopsticks13"
+    repositories = ["Chopsticks13/gcp-foundation-modules"]
+  }
+}
+
+# --- Dev environment ---
+
 unit "dev_project" {
   source = "../units/project"
   path   = "dev/project"

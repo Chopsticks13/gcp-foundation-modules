@@ -4,6 +4,10 @@
 
 `main` is the single source of truth. All changes go through short-lived branches.
 
+References:
+- [DORA: trunk-based development](https://dora.dev/capabilities/trunk-based-development/)
+- [Terragrunt: IaC repo structure](https://docs.terragrunt.com/getting-started/terminology/)
+
 ```mermaid
 gitGraph
   commit id: "v0.1.0"

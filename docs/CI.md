@@ -43,8 +43,9 @@ type constraints are satisfied. Does not connect to any cloud provider.
 
 ### TFLint
 
-A pluggable linter for Terraform. Goes beyond `validate` to catch things that
-are syntactically valid but wrong:
+[TFLint](https://github.com/terraform-linters/tflint) is a pluggable linter
+for Terraform. Goes beyond `validate` to catch things that are syntactically
+valid but wrong:
 
 | What it catches | Example |
 |----------------|---------|
@@ -56,14 +57,15 @@ are syntactically valid but wrong:
 | Google-specific rules | Invalid machine types, wrong region formats |
 
 We use two plugins:
-- **terraform** — general Terraform best practices
-- **google** — GCP-specific rules (validates resource arguments against the real API)
+- [**terraform**](https://github.com/terraform-linters/tflint-ruleset-terraform) — general Terraform best practices
+- [**google**](https://github.com/terraform-linters/tflint-ruleset-google) — GCP-specific rules (validates resource arguments against the real API)
 
 Config: [.tflint.hcl](../.tflint.hcl)
 
 ### Checkov
 
-Static analysis security scanner. Scans Terraform modules for misconfigurations:
+[Checkov](https://www.checkov.io/) is a static analysis security scanner by
+Bridgecrew/Palo Alto. Scans Terraform modules for misconfigurations:
 
 | What it catches | Example |
 |----------------|---------|
@@ -79,9 +81,9 @@ our context.
 
 ### TruffleHog
 
-Scans the Git diff for accidentally committed secrets — API keys, tokens,
-passwords, private keys. Compares the PR branch against `main` so it only
-checks new changes.
+[TruffleHog](https://github.com/trufflesecurity/trufflehog) scans the Git diff
+for accidentally committed secrets — API keys, tokens, passwords, private keys.
+Compares the PR branch against `main` so it only checks new changes.
 
 ### Terragrunt Stack Plan
 

@@ -5,6 +5,12 @@ Our naming follows patterns from
 [Azure Cloud Adoption Framework](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/resource-naming),
 and general industry consensus. We didn't reinvent the wheel — we just picked a prefix.
 
+References:
+- [GCP bucket naming rules](https://cloud.google.com/storage/docs/naming-buckets)
+- [GCP landing zone resource hierarchy](https://cloud.google.com/architecture/landing-zones/decide-resource-hierarchy)
+- [Azure resource naming conventions](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/resource-naming)
+- [Fabric FAST bootstrap (prefix pattern)](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric/tree/master/fast/stages/0-org-setup)
+
 ## Prefix
 
 All resources use the prefix `ops`. GCP project IDs are globally unique, so some
