@@ -68,35 +68,10 @@ jobs:
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
 
-  discover:
-    name: Discover Environments
-    runs-on: ubuntu-latest
-    outputs:
-      environments: ${{ steps.find.outputs.environments }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Find Environments
-        id: find
-        run: |
-          if [ -d "environments" ]; then
-            ENVS=$(find environments -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          else
-            ENVS='[]'
-          fi
-          echo "environments=$ENVS" >> $GITHUB_OUTPUT
-          echo "Found environments: $ENVS"
-
   plan:
-    name: Plan - ${{ matrix.environment }}
+    name: Plan
     runs-on: ubuntu-latest
-    needs: [validate, security, discover]
-    if: needs.discover.outputs.environments != '[]'
-    strategy:
-      fail-fast: false
-      matrix:
-        environment: ${{ fromJson(needs.discover.outputs.environments) }}
+    needs: [validate, security]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -110,79 +85,52 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Terragrunt Plan - ${{ matrix.environment }}
+      - name: Terragrunt Stack Plan
         id: plan
         run: |
           set -euo pipefail
-          cd environments/${{ matrix.environment }}
-          echo "## Plan for ${{ matrix.environment }}" > plan_output.txt
+          cd live
+          echo "## Stack Plan" > plan_output.txt
           echo "" >> plan_output.txt
-          terragrunt run --all plan --non-interactive -- -lock=false 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee -a plan_output.txt
+          terragrunt stack run -- plan -lock=false 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee -a plan_output.txt
 
       - name: Upload Plan Output
         uses: actions/upload-artifact@v4
         with:
-          name: plan-${{ matrix.environment }}
-          path: environments/${{ matrix.environment }}/plan_output.txt
+          name: plan-output
+          path: live/plan_output.txt
 
   comment:
     name: Comment PR
     runs-on: ubuntu-latest
-    needs: [plan, discover]
-    if: always() && needs.discover.result == 'success' && needs.plan.result != 'skipped'
+    needs: [plan]
+    if: always() && needs.plan.result != 'skipped'
     steps:
-      - name: Download All Plan Outputs
+      - name: Download Plan Output
         uses: actions/download-artifact@v4
         with:
+          name: plan-output
           path: plans
-          pattern: plan-*
-          merge-multiple: false
 
-      - name: Combine and Comment
+      - name: Comment on PR
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const path = require('path');
-
-            const plansDir = 'plans';
-            if (!fs.existsSync(plansDir) || fs.readdirSync(plansDir).length === 0) {
-              console.log('No plan outputs found, skipping comment');
+            const planFile = 'plans/plan_output.txt';
+            if (!fs.existsSync(planFile)) {
+              console.log('No plan output found, skipping comment');
               return;
             }
 
-            const planStatus = '${{ needs.plan.result }}';
-            const statusEmoji = planStatus === 'success' ? '✅' : '❌';
+            const content = fs.readFileSync(planFile, 'utf8');
+            const status = '${{ needs.plan.result }}';
+            const emoji = status === 'success' ? '✅' : '❌';
+            const truncated = content.length > 60000
+              ? content.substring(0, 60000) + '\n\n... truncated ...'
+              : content;
 
-            let body = `## ${statusEmoji} Terragrunt Plan Results\n\n`;
-            body += `**Status:** ${planStatus}\n\n`;
-
-            const envDirs = fs.readdirSync(plansDir).sort();
-            for (const envDir of envDirs) {
-              const planFile = path.join(plansDir, envDir, 'plan_output.txt');
-              if (fs.existsSync(planFile)) {
-                let content = fs.readFileSync(planFile, 'utf8');
-                const envName = envDir.replace('plan-', '');
-
-                const planMatch = content.match(/Terraform will perform the following actions:[\s\S]*Plan: \d+ to add[\s\S]*?(?=\n\n|$)/);
-                const planContent = planMatch ? planMatch[0] : content;
-
-                const addMatch = content.match(/(\d+) to add/);
-                const changeMatch = content.match(/(\d+) to change/);
-                const destroyMatch = content.match(/(\d+) to destroy/);
-
-                let summary = '';
-                if (addMatch || changeMatch || destroyMatch) {
-                  summary = ` (${addMatch?.[0] || '0 to add'}, ${changeMatch?.[0] || '0 to change'}, ${destroyMatch?.[0] || '0 to destroy'})`;
-                }
-
-                const truncated = planContent.length > 60000
-                  ? planContent.substring(0, 60000) + '\n\n... truncated ...'
-                  : planContent;
-
-                body += `<details>\n<summary><b>${envName}</b>${summary}</summary>\n\n\`\`\`hcl\n${truncated}\n\`\`\`\n</details>\n\n`;
-              }
-            }
+            const body = `## ${emoji} Terragrunt Stack Plan\n\n**Status:** ${status}\n\n<details>\n<summary>Plan output</summary>\n\n\`\`\`\n${truncated}\n\`\`\`\n</details>`;
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,

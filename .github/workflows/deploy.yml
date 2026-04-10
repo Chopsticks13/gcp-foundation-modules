@@ -4,81 +4,20 @@ on:
   push:
     branches: [main]
     paths:
-      - 'environments/**'
+      - 'modules/**'
+      - 'units/**'
+      - 'live/**'
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        type: choice
-        options:
-          - dev
-          - staging
-          - prod
-      project:
-        description: 'Specific project (leave empty for all in environment)'
-        required: false
-        type: string
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-  discover:
-    name: Discover Changes
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-      has_changes: ${{ steps.set-matrix.outputs.has_changes }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Determine what to deploy
-        id: set-matrix
-        run: |
-          set -euo pipefail
-
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            ENV="${{ inputs.environment }}"
-            PROJECT="${{ inputs.project }}"
-
-            if [ -n "$PROJECT" ]; then
-              MATRIX="[{\"environment\": \"$ENV\", \"project\": \"$PROJECT\"}]"
-            else
-              PROJECTS=$(find environments/$ENV -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | jq -R -s -c 'split("\n") | map(select(length > 0))')
-              MATRIX=$(echo "$PROJECTS" | jq -c --arg env "$ENV" '[.[] | {environment: $env, project: .}]')
-            fi
-          else
-            CHANGED=$(git diff --name-only HEAD^ HEAD | grep "^environments/" | cut -d'/' -f2,3 | sort -u | grep "/" || echo "")
-
-            if [ -z "$CHANGED" ]; then
-              echo "has_changes=false" >> $GITHUB_OUTPUT
-              echo "matrix=[]" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-
-            MATRIX=$(echo "$CHANGED" | jq -R -s -c 'split("\n") | map(select(length > 0)) | map(split("/") | {environment: .[0], project: .[1]})')
-          fi
-
-          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
-          echo "has_changes=true" >> $GITHUB_OUTPUT
-          echo "Deployment matrix: $MATRIX"
-
   deploy:
-    name: Deploy ${{ matrix.environment }}/${{ matrix.project }}
-    needs: discover
-    if: needs.discover.outputs.has_changes == 'true'
+    name: Deploy Stack
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix:
-        include: ${{ fromJson(needs.discover.outputs.matrix) }}
-    environment: ${{ matrix.environment }}
+    environment: dev
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -94,6 +33,5 @@ jobs:
 
       - name: Deploy
         run: |
-          cd environments/${{ matrix.environment }}/${{ matrix.project }}
-          echo "Deploying ${{ matrix.environment }}/${{ matrix.project }}"
-          terragrunt run --all apply --non-interactive -- -auto-approve
+          cd live
+          terragrunt stack run -- apply -auto-approve
