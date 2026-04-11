@@ -25,6 +25,15 @@ unit "dev_project" {
     project_name    = "Ops Dev"
     deletion_policy = "DELETE"
     team            = "platform"
+
+    # Grant the CI/CD SA access to this project (no GCP Org = per-project grants)
+    iam_additive = {
+      "roles/browser"                          = ["serviceAccount:sa-ops-github-deploy@ops-admin-7x2.iam.gserviceaccount.com"]
+      "roles/serviceusage.serviceUsageAdmin"   = ["serviceAccount:sa-ops-github-deploy@ops-admin-7x2.iam.gserviceaccount.com"]
+      "roles/iam.serviceAccountAdmin"          = ["serviceAccount:sa-ops-github-deploy@ops-admin-7x2.iam.gserviceaccount.com"]
+      "roles/storage.admin"                    = ["serviceAccount:sa-ops-github-deploy@ops-admin-7x2.iam.gserviceaccount.com"]
+      "roles/resourcemanager.projectIamAdmin"  = ["serviceAccount:sa-ops-github-deploy@ops-admin-7x2.iam.gserviceaccount.com"]
+    }
   }
 }
 

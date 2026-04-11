@@ -37,4 +37,6 @@ inputs = {
     "serviceusage.googleapis.com",
     "storage.googleapis.com",
   ])
+
+  iam_additive = try(values.iam_additive, {})
 }
