@@ -14,4 +14,7 @@ locals {
   terraform_state_bucket  = "ops-tfstate-7x2"
 
   default_region = "europe-west2"
+
+  # CI/CD service account (used in iam_additive for per-project access)
+  cicd_sa = "serviceAccount:sa-ops-github-deploy@ops-admin-7x2.iam.gserviceaccount.com"
 }

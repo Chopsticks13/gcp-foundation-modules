@@ -38,5 +38,14 @@ inputs = {
     "storage.googleapis.com",
   ])
 
-  iam_additive = try(values.iam_additive, {})
+  # Grant CI/CD SA access to every project (no GCP Org = per-project grants).
+  # The SA email comes from org.hcl, not from stack values, to avoid
+  # GitHub Actions secret masking breaking the for_each keys.
+  iam_additive = {
+    "roles/browser"                         = [include.org.locals.cicd_sa]
+    "roles/serviceusage.serviceUsageAdmin"  = [include.org.locals.cicd_sa]
+    "roles/iam.serviceAccountAdmin"         = [include.org.locals.cicd_sa]
+    "roles/storage.admin"                   = [include.org.locals.cicd_sa]
+    "roles/resourcemanager.projectIamAdmin" = [include.org.locals.cicd_sa]
+  }
 }
