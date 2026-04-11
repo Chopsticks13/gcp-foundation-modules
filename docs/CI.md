@@ -27,42 +27,24 @@ flowchart TD
 Validation and security run **in parallel**. Plan runs after both pass —
 no point planning broken code against GCP.
 
-## Smart Planning with --filter-affected
+## Planning Strategy
 
-This is the key feature that keeps CI fast as the stack grows.
+CI runs `terragrunt stack run -- plan` which plans all units in the stack.
+At our current size (4 units, ~20 seconds) this is fast enough.
 
-Instead of planning the entire stack on every PR, Terragrunt uses
-[git-based filters](https://docs.terragrunt.com/features/filter/git) to detect
-which units were affected by the PR's changes:
+### Future: --filter-affected
+
+Terragrunt 1.0 supports [git-based filters](https://docs.terragrunt.com/features/filter/git)
+that only plan units affected by a PR's changes:
 
 ```bash
-# Plans EVERYTHING (slow, doesn't scale):
-terragrunt stack run -- plan
-
-# Plans only what changed in this PR (fast, scales):
-terragrunt run --all --filter-affected -- plan
+terragrunt run --all --filter '[main...HEAD]' -- plan
 ```
 
-### How it works
-
-1. Terragrunt runs `git diff main...HEAD` to find changed files
-2. Maps changed files to the units that use them
-3. Only plans those units (and their dependencies)
-
-### Examples
-
-| What you changed | What gets planned |
-|------------------|-------------------|
-| `modules/gcs/main.tf` | `dev/gcs` only |
-| `units/project/terragrunt.hcl` | `dev/project` → `dev/gcs` + `dev/iam-service-account` (dependencies) |
-| `live/terragrunt.stack.hcl` | All units (stack definition changed) |
-| `docs/NAMING.md` | Nothing (no `.tf` or `.hcl` changed) |
-
-### Removed units
-
-Terragrunt automatically detects units that were removed between `main` and
-`HEAD`. It plans their destruction — but won't destroy without the
-`--filter-allow-destroy` flag. This is a safety guardrail.
+This works well for repos with **standalone units** (no stack). For our
+**stack-based** setup, the filter discovers the unit templates in `units/`
+and tries to run them directly — but they need `values` from the stack
+to work. When Terragrunt adds filter support to `stack run`, we'll switch.
 
 Reference: [Terragrunt: Git filter docs](https://docs.terragrunt.com/features/filter/git)
 
