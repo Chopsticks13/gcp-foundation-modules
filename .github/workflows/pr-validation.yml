@@ -68,7 +68,7 @@ jobs:
           head: HEAD
 
   plan:
-    name: Plan
+    name: Terragrunt Plan
     runs-on: ubuntu-latest
     needs: [validate, security]
     steps:
