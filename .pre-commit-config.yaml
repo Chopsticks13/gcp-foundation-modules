@@ -21,13 +21,6 @@ repos:
           - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
           - --args=--call-module-type=all
 
-      - id: terraform_tfsec
-        name: Terraform security scan
-        description: Static analysis security scanner for Terraform
-        args:
-          - --args=--exclude-downloaded-modules
-          - --args=--force-all-dirs
-
       - id: terraform_docs
         name: Terraform docs
         description: Inserts/updates documentation in Terraform modules

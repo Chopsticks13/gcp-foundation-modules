@@ -22,7 +22,6 @@ body:
         - dev
         - staging
         - prod
-        - sandbox
     validations:
       required: true
 
@@ -30,8 +29,8 @@ body:
     id: project-id
     attributes:
       label: Proposed Project ID
-      description: Must be 6-30 characters, lowercase letters, numbers, hyphens
-      placeholder: "e.g., dev-my-service"
+      description: "Must follow naming convention: ops-{env}-{purpose}-7x2"
+      placeholder: "e.g., ops-dev-data-7x2"
     validations:
       required: true
 
@@ -40,7 +39,7 @@ body:
     attributes:
       label: Project Name
       description: Human-readable project name
-      placeholder: "e.g., My Service Project"
+      placeholder: "e.g., Ops Dev Data"
     validations:
       required: true
 
@@ -53,15 +52,6 @@ body:
     validations:
       required: true
 
-  - type: input
-    id: cost-center
-    attributes:
-      label: Cost Center
-      description: Cost center code for billing
-      placeholder: "e.g., CC-00001"
-    validations:
-      required: true
-
   - type: textarea
     id: purpose
     attributes:
@@ -71,88 +61,24 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: apis-compute
-    attributes:
-      label: Enable Compute Engine API?
-      options:
-        - "Yes"
-        - "No"
-      default: 0
-
-  - type: dropdown
-    id: apis-gke
-    attributes:
-      label: Enable GKE API?
-      options:
-        - "Yes"
-        - "No"
-      default: 1
-
-  - type: dropdown
-    id: apis-cloudrun
-    attributes:
-      label: Enable Cloud Run API?
-      options:
-        - "Yes"
-        - "No"
-      default: 1
-
-  - type: dropdown
-    id: apis-cloudsql
-    attributes:
-      label: Enable Cloud SQL API?
-      options:
-        - "Yes"
-        - "No"
-      default: 1
-
-  - type: dropdown
-    id: apis-secrets
-    attributes:
-      label: Enable Secret Manager API?
-      options:
-        - "Yes"
-        - "No"
-      default: 0
-
-  - type: dropdown
-    id: apis-kms
-    attributes:
-      label: Enable Cloud KMS API?
-      options:
-        - "Yes"
-        - "No"
-      default: 1
-
-  - type: dropdown
-    id: apis-logging
-    attributes:
-      label: Enable Cloud Logging API?
-      options:
-        - "Yes"
-        - "No"
-      default: 0
-
-  - type: dropdown
-    id: apis-monitoring
-    attributes:
-      label: Enable Cloud Monitoring API?
-      options:
-        - "Yes"
-        - "No"
-      default: 0
-
   - type: textarea
-    id: additional-apis
+    id: services
     attributes:
-      label: Additional APIs
-      description: Any other GCP APIs needed?
+      label: GCP APIs to enable
+      description: List the APIs this project needs
       placeholder: |
-        - pubsub.googleapis.com
+        - compute.googleapis.com
+        - container.googleapis.com
+        - storage.googleapis.com
+      value: |
+        - cloudresourcemanager.googleapis.com
+        - iam.googleapis.com
+        - logging.googleapis.com
+        - monitoring.googleapis.com
+        - serviceusage.googleapis.com
         - storage.googleapis.com
     validations:
-      required: false
+      required: true
 
   - type: textarea
     id: iam-bindings
@@ -160,33 +86,10 @@ body:
       label: IAM Bindings
       description: Any specific IAM bindings required?
       placeholder: |
-        - roles/viewer for user:someone@example.com
-        - roles/editor for group:team@example.com
+        - roles/viewer: ["user:someone@example.com"]
+        - roles/editor: ["group:team@example.com"]
     validations:
       required: false
-
-  - type: textarea
-    id: service-accounts
-    attributes:
-      label: Service Accounts
-      description: Service accounts needed for this project
-      placeholder: |
-        - Account ID: my-service-sa
-          Display Name: My Service Account
-          Description: Used for X purpose
-          Roles: roles/storage.objectViewer
-    validations:
-      required: false
-
-  - type: dropdown
-    id: org-policies
-    attributes:
-      label: Apply Default Organization Policies?
-      description: Enforce OS Login, skip default network, uniform bucket access
-      options:
-        - "Yes (Recommended)"
-        - "No"
-      default: 0
 
   - type: textarea
     id: additional-context
@@ -201,9 +104,7 @@ body:
     attributes:
       label: Pre-submission Checklist
       options:
-        - label: I have verified the project ID follows naming conventions
-          required: true
-        - label: I have confirmed budget/cost center approval
+        - label: I have verified the project ID follows naming conventions (see docs/NAMING.md)
           required: true
         - label: I have identified the team/owner responsible for this project
           required: true
