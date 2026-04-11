@@ -14,16 +14,18 @@ Inspired by [cloud-foundation-fabric](https://github.com/GoogleCloudPlatform/clo
 
 ```mermaid
 flowchart TD
-  subgraph bootstrap["Bootstrap (ops-admin-7x2)"]
+  subgraph bootstrap["Bootstrap"]
     wif["WIF: GitHub OIDC + SA"]
-    bucket["State: ops-tfstate-7x2"]
+    bucket["State bucket"]
   end
 
   subgraph live["live/terragrunt.stack.hcl"]
     direction TB
-    dev_proj["dev/project"]
-    dev_sa["dev/iam-service-account"]
-    dev_gcs["dev/gcs"]
+    subgraph env["Per environment"]
+      proj["project"]
+      sa["iam-service-account"]
+      gcs["gcs"]
+    end
   end
 
   subgraph modules["modules/"]
@@ -34,11 +36,11 @@ flowchart TD
   end
 
   wif --> m_wif
-  dev_proj --> m_proj
-  dev_sa --> m_sa
-  dev_gcs --> m_gcs
-  dev_sa -.->|depends on| dev_proj
-  dev_gcs -.->|depends on| dev_proj
+  proj --> m_proj
+  sa --> m_sa
+  gcs --> m_gcs
+  sa -.->|depends on| proj
+  gcs -.->|depends on| proj
   bucket -.->|stores state for| live
 ```
 
