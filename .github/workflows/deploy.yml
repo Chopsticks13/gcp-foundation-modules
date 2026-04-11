@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   deploy:
-    name: Deploy Stack
+    name: Terragrunt Apply
     runs-on: ubuntu-latest
     environment: dev
     steps:
