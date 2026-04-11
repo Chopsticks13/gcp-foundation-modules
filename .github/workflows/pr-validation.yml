@@ -86,34 +86,22 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Find affected units
-        id: affected
-        run: |
-          cd live
-          terragrunt stack generate
-          AFFECTED=$(terragrunt find --filter-affected 2>&1 || true)
-          echo "affected=$AFFECTED" >> $GITHUB_OUTPUT
-          if [ -z "$AFFECTED" ]; then
-            echo "No units affected by this PR"
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          else
-            echo "Affected units:"
-            echo "$AFFECTED"
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          fi
-
       - name: Terragrunt Plan (affected units)
-        if: steps.affected.outputs.has_changes == 'true'
         id: plan
         run: |
           set -euo pipefail
           cd live
+          terragrunt stack generate
           echo "## Stack Plan (affected units only)" > plan_output.txt
           echo "" >> plan_output.txt
-          terragrunt run --all --filter-affected -- plan -lock=false 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee -a plan_output.txt
+          echo "### Affected units" >> plan_output.txt
+          terragrunt find --filter '[origin/main...HEAD]' 2>&1 | tee -a plan_output.txt || true
+          echo "" >> plan_output.txt
+          echo "### Plan output" >> plan_output.txt
+          terragrunt run --all --filter '[origin/main...HEAD]' -- plan -lock=false 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee -a plan_output.txt
 
       - name: Upload Plan Output
-        if: steps.affected.outputs.has_changes == 'true'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: plan-output
