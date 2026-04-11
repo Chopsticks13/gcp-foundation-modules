@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   validate:
-    name: Validate Configuration
+    name: Validate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -68,12 +68,14 @@ jobs:
           head: HEAD
 
   plan:
-    name: Plan
+    name: Plan (changed only)
     runs-on: ubuntu-latest
     needs: [validate, security]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install mise
         uses: jdx/mise-action@v2
@@ -84,16 +86,34 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Terragrunt Stack Plan
+      - name: Find affected units
+        id: affected
+        run: |
+          cd live
+          terragrunt stack generate
+          AFFECTED=$(terragrunt find --filter-affected 2>&1 || true)
+          echo "affected=$AFFECTED" >> $GITHUB_OUTPUT
+          if [ -z "$AFFECTED" ]; then
+            echo "No units affected by this PR"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Affected units:"
+            echo "$AFFECTED"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Terragrunt Plan (affected units)
+        if: steps.affected.outputs.has_changes == 'true'
         id: plan
         run: |
           set -euo pipefail
           cd live
-          echo "## Stack Plan" > plan_output.txt
+          echo "## Stack Plan (affected units only)" > plan_output.txt
           echo "" >> plan_output.txt
-          terragrunt stack run -- plan -lock=false 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee -a plan_output.txt
+          terragrunt run --all --filter-affected -- plan -lock=false 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee -a plan_output.txt
 
       - name: Upload Plan Output
+        if: steps.affected.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: plan-output
@@ -103,13 +123,14 @@ jobs:
     name: Comment PR
     runs-on: ubuntu-latest
     needs: [plan]
-    if: always() && needs.plan.result != 'skipped'
+    if: always() && needs.plan.result == 'success'
     steps:
       - name: Download Plan Output
         uses: actions/download-artifact@v4
         with:
           name: plan-output
           path: plans
+        continue-on-error: true
 
       - name: Comment on PR
         uses: actions/github-script@v7
@@ -118,7 +139,13 @@ jobs:
             const fs = require('fs');
             const planFile = 'plans/plan_output.txt';
             if (!fs.existsSync(planFile)) {
-              console.log('No plan output found, skipping comment');
+              const body = `## Terragrunt Plan\n\nNo units affected by this PR — nothing to plan.`;
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
               return;
             }
 
@@ -129,7 +156,7 @@ jobs:
               ? content.substring(0, 60000) + '\n\n... truncated ...'
               : content;
 
-            const body = `## ${emoji} Terragrunt Stack Plan\n\n**Status:** ${status}\n\n<details>\n<summary>Plan output</summary>\n\n\`\`\`\n${truncated}\n\`\`\`\n</details>`;
+            const body = `## ${emoji} Terragrunt Plan (affected units only)\n\n**Status:** ${status}\n\n<details>\n<summary>Plan output</summary>\n\n\`\`\`\n${truncated}\n\`\`\`\n</details>`;
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
