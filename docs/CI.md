@@ -41,12 +41,27 @@ that only plan units affected by a PR's changes:
 terragrunt run --all --filter '[main...HEAD]' -- plan
 ```
 
-This works well for repos with **standalone units** (no stack). For our
-**stack-based** setup, the filter discovers the unit templates in `units/`
-and tries to run them directly — but they need `values` from the stack
-to work. When Terragrunt adds filter support to `stack run`, we'll switch.
+For our **stack-based** setup, the filter was discovering unit templates in
+`units/` and trying to run them directly — but they need `values` from
+the stack to work. The TG team
+[confirmed](https://github.com/gruntwork-io/terragrunt/discussions/5882)
+the fix: use a `.terragrunt-filters` file to exclude the `units/` directory
+from discovery. We've added this file, so `--filter` can be used in future.
 
-Reference: [Terragrunt: Git filter docs](https://docs.terragrunt.com/features/filter/git)
+For now, CI uses `terragrunt stack run -- plan` (plans all units). When
+the stack grows large enough that this becomes slow, switch to:
+
+```bash
+terragrunt run --all --filter '[origin/main...HEAD]' -- plan
+```
+
+The `.terragrunt-filters` file will automatically exclude `units/` from
+discovery.
+
+References:
+- [Terragrunt: Git filter docs](https://docs.terragrunt.com/features/filter/git)
+- [Terragrunt: Filters file](https://docs.terragrunt.com/features/filter/filters-file/)
+- [Our discussion with TG team](https://github.com/gruntwork-io/terragrunt/discussions/5882)
 
 ## What Each Check Does
 

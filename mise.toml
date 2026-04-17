@@ -1,7 +1,7 @@
 [tools]
 # IaC core
 terraform = "1.9.8"
-terragrunt = "1.0.0"
+terragrunt = "1.0.1"
 
 # Linting & quality
 tflint = "0.53.0"
