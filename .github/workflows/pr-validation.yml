@@ -74,6 +74,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install mise
         uses: jdx/mise-action@v2
@@ -89,7 +91,8 @@ jobs:
         run: |
           set -euo pipefail
           cd live
-          terragrunt stack run -- plan -lock=false 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee plan_output.txt
+          terragrunt stack generate
+          terragrunt run --all --filter '[origin/main...HEAD]' -- plan -lock=false 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee plan_output.txt
 
       - name: Upload Plan Output
         if: always()
