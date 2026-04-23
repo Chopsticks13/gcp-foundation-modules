@@ -13,33 +13,15 @@ Inspired by [cloud-foundation-fabric](https://github.com/GoogleCloudPlatform/clo
 ## Architecture
 
 ```mermaid
-flowchart TD
-  subgraph bootstrap["Bootstrap (ops-admin-7x2)"]
-    wif["WIF: GitHub OIDC + SA"]
-    bucket["State: ops-tfstate-7x2"]
-  end
+flowchart LR
+  live["live/<br/>terragrunt.stack.hcl<br/>(environments)"]
+  units["units/<br/>(reusable wrappers)"]
+  modules["modules/<br/>(pure Terraform)"]
+  bootstrap["Bootstrap<br/>(state + WIF)"]
 
-  subgraph live["live/terragrunt.stack.hcl"]
-    direction TB
-    dev_proj["dev/project"]
-    dev_sa["dev/iam-service-account"]
-    dev_gcs["dev/gcs"]
-  end
-
-  subgraph modules["modules/"]
-    m_proj["project"]
-    m_sa["iam-service-account"]
-    m_gcs["gcs"]
-    m_wif["wif-github"]
-  end
-
-  wif --> m_wif
-  dev_proj --> m_proj
-  dev_sa --> m_sa
-  dev_gcs --> m_gcs
-  dev_sa -.->|depends on| dev_proj
-  dev_gcs -.->|depends on| dev_proj
-  bucket -.->|stores state for| live
+  live -->|values| units
+  units -->|sources| modules
+  bootstrap -.->|stores state| live
 ```
 
 ## Modules
