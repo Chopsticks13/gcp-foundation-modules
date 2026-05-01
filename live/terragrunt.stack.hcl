@@ -51,3 +51,14 @@ unit "dev_bucket" {
   }
 }
 
+unit "dev_logs_bucket" {
+  source = "../units/gcs"
+  path   = "dev/gcs-logs"
+
+  values = {
+    environment = "dev"
+    bucket_name = "ops-dev-logs-7x2"
+    versioning  = false
+  }
+}
+
