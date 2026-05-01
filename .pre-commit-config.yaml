@@ -91,6 +91,15 @@ repos:
           - --config-file=.yamllint.yaml
         files: \.(yaml|yml)$
 
+  # Conventional commits
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.6.0
+    hooks:
+      - id: conventional-pre-commit
+        name: Conventional commit message
+        stages: [commit-msg]
+        args: [feat, fix, chore, docs, refactor]
+
   # Markdown linting
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.43.0
