@@ -29,10 +29,6 @@ repos:
           - --hook-config=--add-to-existing-file=true
           - --hook-config=--create-file-if-not-exist=true
 
-      - id: terragrunt_fmt
-        name: Terragrunt format
-        description: Rewrites all Terragrunt configuration files to canonical format
-
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
