@@ -10,19 +10,71 @@
 Reusable Terraform modules + Terragrunt 1.0 stacks for GCP infrastructure.
 Inspired by [cloud-foundation-fabric](https://github.com/GoogleCloudPlatform/cloud-foundation-fabric) design patterns.
 
-## Architecture
+## How It Works
+
+```mermaid
+flowchart TB
+  subgraph stack["live/terragrunt.stack.hcl"]
+    direction LR
+    wif["WIF"]
+    proj["Project"]
+    sa["Service Account"]
+    gcs["GCS Bucket"]
+    proj --> sa
+    proj --> gcs
+  end
+
+  subgraph units["units/ — wires modules to your GCP setup"]
+    direction LR
+    u1["project"]
+    u2["iam-service-account"]
+    u3["gcs"]
+    u4["wif-github"]
+  end
+
+  subgraph modules["modules/ — pure Terraform, reusable anywhere"]
+    direction LR
+    m1["project"]
+    m2["iam-service-account"]
+    m3["gcs"]
+    m4["wif-github"]
+  end
+
+  stack -->|"values (project_id, env, team...)"| units
+  units -->|"sources"| modules
+```
+
+> **One file, one command, full environment.** Add staging or prod by adding a block with different values — same modules, same units, different inputs.
+
+## What Gets Deployed
 
 ```mermaid
 flowchart LR
-  live["live/<br/>terragrunt.stack.hcl<br/>(environments)"]
-  units["units/<br/>(reusable wrappers)"]
-  modules["modules/<br/>(pure Terraform)"]
-  bootstrap["Bootstrap<br/>(state + WIF)"]
+  subgraph bootstrap["Bootstrap (manual, one-time)"]
+    admin["ops-admin-7x2<br/>state bucket + WIF"]
+  end
 
-  live -->|values| units
-  units -->|sources| modules
-  bootstrap -.->|stores state| live
+  subgraph dev["Dev (Terraform-managed)"]
+    devproj["ops-dev-7x2<br/>project + 7 APIs"]
+    devsa["sa-ops-dev-deploy<br/>service account"]
+    devgcs["ops-dev-data-7x2<br/>GCS bucket"]
+  end
+
+  admin -->|"authenticates CI via WIF"| dev
+  admin -->|"stores Terraform state"| dev
 ```
+
+## CI/CD Pipeline
+
+```mermaid
+flowchart LR
+  pr["PR opened"] --> validate["Validate<br/>fmt, tflint, checkov"]
+  validate --> plan["Terragrunt Plan<br/>(changed units only)"]
+  plan --> review["Review + merge"]
+  review --> apply["Terragrunt Apply<br/>(auto-deploy to dev)"]
+```
+
+Every PR runs validation and security scans. Plan only runs against units affected by the change. See [docs/CI.md](docs/CI.md) for details.
 
 ## Modules
 
@@ -37,7 +89,7 @@ flowchart LR
 
 ### Prerequisites
 
-Install [mise](https://mise.jdx.dev):
+Install [mise](https://mise.jdx.dev) (manages all tool versions from one file):
 
 ```bash
 curl https://mise.jdx.dev/install.sh | sh
@@ -48,8 +100,8 @@ curl https://mise.jdx.dev/install.sh | sh
 ```bash
 git clone https://github.com/Chopsticks13/gcp-foundation-modules.git
 cd gcp-foundation-modules
-mise trust && mise install
-pre-commit install
+mise trust && mise install    # installs terraform, terragrunt, tflint, etc.
+pre-commit install            # sets up git hooks
 ```
 
 ### Deploy
@@ -64,9 +116,9 @@ terragrunt stack run -- apply    # apply all units
 ### Useful Commands
 
 ```bash
-terragrunt list                  # list all units
-terragrunt dag graph             # show dependency graph (pipe to dot for PNG)
-terragrunt stack output          # show outputs from all units
+terragrunt list                  # list all units in the stack
+terragrunt dag graph             # dependency graph (pipe to dot for PNG)
+terragrunt stack output          # outputs from all deployed units
 terragrunt stack clean           # remove generated files
 ```
 
@@ -75,24 +127,20 @@ terragrunt stack clean           # remove generated files
 ```
 gcp-foundation-modules/
 ├── modules/                  # Layer 1: Pure Terraform modules
-│   ├── project/
+│   ├── project/              #   GCP project, APIs, IAM, org policies
+│   ├── iam-service-account/  #   Service account with IAM on/for SA
+│   ├── gcs/                  #   GCS bucket with lifecycle, IAM
+│   └── wif-github/           #   WIF pool, OIDC provider, deploy SA
+├── units/                    # Layer 2: Terragrunt wrappers
+│   ├── project/              #   Wires project module to our GCP setup
 │   ├── iam-service-account/
 │   ├── gcs/
 │   └── wif-github/
-├── units/                    # Layer 2: Terragrunt unit definitions
-│   ├── project/
-│   ├── iam-service-account/
-│   ├── gcs/
-│   └── wif-github/
-├── live/                     # Layer 3: Actual deployments
-│   └── terragrunt.stack.hcl
-├── docs/                     # Documentation
-│   ├── BRANCHING.md          # Trunk-based development strategy
-│   ├── CI.md                 # CI/CD pipeline explained
-│   ├── NAMING.md             # Resource naming conventions
-│   └── WIF.md                # Workload Identity Federation setup
-├── root.hcl                  # Remote state + provider generation
-├── org.hcl                   # Org-wide config (billing, region)
+├── live/                     # Layer 3: What actually gets deployed
+│   └── terragrunt.stack.hcl  #   Declares environments + values
+├── docs/                     # Decision docs with diagrams
+├── root.hcl                  # Remote state (GCS) + provider config
+├── org.hcl                   # Billing, region, CI/CD SA
 └── mise.toml                 # Tool version pinning
 ```
 
@@ -102,10 +150,10 @@ gcp-foundation-modules/
 |-----|---------------|
 | [Bootstrap](docs/BOOTSTRAP.md) | Chicken-and-egg problem, project structure, no-org decision |
 | [Branching](docs/BRANCHING.md) | Trunk-based dev, branch naming, deployment flow |
-| [Terragrunt](docs/TERRAGRUNT.md) | Why Terragrunt, how stacks work, the three-layer architecture |
+| [Terragrunt](docs/TERRAGRUNT.md) | Why Terragrunt over pure Terraform, how stacks work |
 | [CI Pipeline](docs/CI.md) | What each validation step does (tflint, checkov, etc.) |
 | [Naming](docs/NAMING.md) | Resource naming conventions with Google/Azure references |
-| [WIF](docs/WIF.md) | Workload Identity Federation setup and bootstrap |
+| [WIF](docs/WIF.md) | Workload Identity Federation — no keys, OIDC auth |
 
 ## Tool Versions
 
