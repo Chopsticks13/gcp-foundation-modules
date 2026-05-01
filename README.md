@@ -13,68 +13,27 @@ Inspired by [cloud-foundation-fabric](https://github.com/GoogleCloudPlatform/clo
 ## How It Works
 
 ```mermaid
-flowchart TB
-  subgraph stack["live/terragrunt.stack.hcl"]
-    direction LR
-    wif["WIF"]
-    proj["Project"]
-    sa["Service Account"]
-    gcs["GCS Bucket"]
-    proj --> sa
-    proj --> gcs
+flowchart LR
+  subgraph ci["CI/CD"]
+    pr["PR"] --> validate["Validate + Plan"]
+    validate --> merge["Merge"] --> apply["Apply"]
   end
 
-  subgraph units["units/ — wires modules to your GCP setup"]
-    direction LR
-    u1["project"]
-    u2["iam-service-account"]
-    u3["gcs"]
-    u4["wif-github"]
+  subgraph repo["Repository"]
+    live["live/<br/>environments"] -->|values| units["units/<br/>wrappers"]
+    units -->|sources| modules["modules/<br/>Terraform"]
   end
 
-  subgraph modules["modules/ — pure Terraform, reusable anywhere"]
-    direction LR
-    m1["project"]
-    m2["iam-service-account"]
-    m3["gcs"]
-    m4["wif-github"]
+  subgraph gcp["Google Cloud"]
+    bootstrap["Bootstrap<br/>state + WIF"]
+    envs["dev / staging / prod"]
   end
 
-  stack -->|"values (project_id, env, team...)"| units
-  units -->|"sources"| modules
+  ci -->|"deploys"| gcp
+  repo -->|"defines"| gcp
 ```
 
 > **One file, one command, full environment.** Add staging or prod by adding a block with different values — same modules, same units, different inputs.
-
-## What Gets Deployed
-
-```mermaid
-flowchart LR
-  subgraph bootstrap["Bootstrap (manual, one-time)"]
-    admin["ops-admin-7x2<br/>state bucket + WIF"]
-  end
-
-  subgraph dev["Dev (Terraform-managed)"]
-    devproj["ops-dev-7x2<br/>project + 7 APIs"]
-    devsa["sa-ops-dev-deploy<br/>service account"]
-    devgcs["ops-dev-data-7x2<br/>GCS bucket"]
-  end
-
-  admin -->|"authenticates CI via WIF"| dev
-  admin -->|"stores Terraform state"| dev
-```
-
-## CI/CD Pipeline
-
-```mermaid
-flowchart LR
-  pr["PR opened"] --> validate["Validate<br/>fmt, tflint, checkov"]
-  validate --> plan["Terragrunt Plan<br/>(changed units only)"]
-  plan --> review["Review + merge"]
-  review --> apply["Terragrunt Apply<br/>(auto-deploy to dev)"]
-```
-
-Every PR runs validation and security scans. Plan only runs against units affected by the change. See [docs/CI.md](docs/CI.md) for details.
 
 ## Modules
 
