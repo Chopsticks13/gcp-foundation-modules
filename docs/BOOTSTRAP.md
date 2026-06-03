@@ -9,6 +9,8 @@ So what creates the first one?
 
 ```mermaid
 flowchart TD
+  org["zacharias.live (org)"]
+
   subgraph chicken["Chicken (created manually)"]
     admin["ops-admin-7x2"]
     bucket["ops-tfstate-7x2"]
@@ -21,6 +23,8 @@ flowchart TD
     prd["ops-prd (future)"]
   end
 
+  org --> admin
+  org --> eggs
   admin --> bucket
   admin --> wif
   wif -->|manages| dev
@@ -46,30 +50,26 @@ gcloud storage buckets update gs://ops-tfstate-7x2 --versioning
 After this, everything else is managed by Terraform — including the WIF
 resources inside the bootstrap project itself.
 
-## No GCP Organisation (and why that's OK)
+## GCP Organisation
 
-This setup runs on a personal Google account, not a GCP Organisation. Here's
-what that means:
+This setup uses a GCP Organisation (`zacharias.live`, ID `161389005902`)
+provisioned via [Cloud Identity Free](https://cloud.google.com/identity).
+All projects sit directly under the organisation.
 
-| Capability | With Org | Without Org (us) |
-|-----------|----------|-------------------|
-| SA creates new projects | Yes (`roles/resourcemanager.projectCreator`) | No — user creates projects, SA manages them |
-| Org-wide policies | Yes (`roles/orgpolicy.policyAdmin`) | No — policies set per-project if needed |
-| Folder hierarchy | Yes (dev/staging/prod folders) | No — flat project list |
-| Centralized IAM | Yes (org-level bindings) | No — per-project bindings |
-| State management | SA via WIF | SA via WIF (same) |
-| Module patterns | Identical | Identical |
+| Capability | Status |
+|-----------|--------|
+| SA creates new projects | Available (`roles/resourcemanager.projectCreator` on org) |
+| Org-wide policies | Available (`roles/orgpolicy.policyAdmin` on org) |
+| Folder hierarchy | Not yet used — flat project list under org |
+| Centralized IAM | Per-project bindings (can move to org-level later) |
+| State management | SA via WIF |
 
-**The module code and stack structure are the same either way.** If you later
-add an Organisation (via [Google Workspace](https://workspace.google.com/) or
-[Cloud Identity](https://cloud.google.com/identity)), the only changes are:
+### Future improvements
 
-1. Add `roles/resourcemanager.projectCreator` and `roles/orgpolicy.policyAdmin`
-   back to the WIF SA (they were removed because they need an org to bind to)
-2. Set `organization_id` in `org.hcl`
-3. Optionally add a `modules/folder` for hierarchy
-
-Everything else — modules, units, stacks, CI/CD, WIF — stays untouched.
+1. Add `roles/resourcemanager.projectCreator` to the WIF SA at org level so
+   CI/CD can create new projects automatically
+2. Add a `modules/folder` for dev/staging/prod hierarchy
+3. Move to org-level IAM bindings where appropriate
 
 ## Project Inventory
 

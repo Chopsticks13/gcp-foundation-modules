@@ -23,6 +23,7 @@ unit "dev_project" {
     environment     = "dev"
     project_id      = "ops-dev-7x2"
     project_name    = "Ops Dev"
+    parent          = "organizations/161389005902"
     deletion_policy = "DELETE"
     team            = "platform"
   }
@@ -61,4 +62,3 @@ unit "dev_logs_bucket" {
     versioning  = false
   }
 }
-
