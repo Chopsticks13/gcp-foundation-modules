@@ -5,6 +5,7 @@ GitHub proves its identity via OIDC, GCP trusts it. No secrets to rotate,
 no keys to leak.
 
 References:
+
 - [Google: WIF with deployment pipelines](https://cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines)
 - [google-github-actions/auth](https://github.com/google-github-actions/auth)
 - [GitHub: OIDC with cloud providers](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-cloud-providers)
@@ -72,9 +73,8 @@ Granted by `modules/wif-github` automatically:
 
 ### On each environment project (e.g., ops-dev-7x2)
 
-Since we don't have a GCP Organisation, the SA can't inherit permissions
-from an org-level binding. Instead, each project grants the SA access
-via `iam_additive` in the stack config:
+Each project grants the SA access via `iam_additive` in the stack config
+(org-level bindings can be added later to reduce per-project grants):
 
 | Role | Why |
 |------|-----|
