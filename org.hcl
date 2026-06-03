@@ -6,7 +6,7 @@
 # This is normal — most GCP orgs have a similar suffix on project IDs.
 
 locals {
-  organization_id = null
+  organization_id = 161389005902
 
   billing_account = "018634-AC68FD-0FE666"
 

@@ -13,24 +13,28 @@ Inspired by [cloud-foundation-fabric](https://github.com/GoogleCloudPlatform/clo
 ## How It Works
 
 ```mermaid
-flowchart LR
-  subgraph ci["CI/CD"]
-    pr["PR"] --> validate["Validate + Plan"]
-    validate --> merge["Merge"] --> apply["Apply"]
-  end
-
+flowchart TB
   subgraph repo["Repository"]
-    live["live/<br/>environments"] -->|values| units["units/<br/>wrappers"]
-    units -->|sources| modules["modules/<br/>Terraform"]
+    direction LR
+    modules["modules/<br/>Terraform"] --- units["units/<br/>wrappers"] --- live["live/<br/>stack"]
   end
 
-  subgraph gcp["Google Cloud"]
-    bootstrap["Bootstrap<br/>state + WIF"]
-    envs["dev / staging / prod"]
+  subgraph ci["CI/CD (GitHub Actions + WIF)"]
+    direction LR
+    pr["PR → Validate + Plan"] --> merge["Merge → Apply"]
   end
 
-  ci -->|"deploys"| gcp
-  repo -->|"defines"| gcp
+  subgraph gcp["Google Cloud — zacharias.live"]
+    direction TB
+    org["Organisation"]
+    org --> admin["ops-admin-7x2<br/>state bucket · WIF · deploy SA"]
+    org --> dev["ops-dev-7x2<br/>dev resources"]
+    org --> stg["ops-stg (future)"]
+    org --> prd["ops-prd (future)"]
+  end
+
+  repo --> ci
+  ci -->|deploys via WIF| gcp
 ```
 
 > **One file, one command, full environment.** Add staging or prod by adding a block with different values — same modules, same units, different inputs.
@@ -83,7 +87,7 @@ terragrunt stack clean           # remove generated files
 
 ## Repository Structure
 
-```
+```text
 gcp-foundation-modules/
 ├── modules/                  # Layer 1: Pure Terraform modules
 │   ├── project/              #   GCP project, APIs, IAM, org policies
@@ -99,7 +103,7 @@ gcp-foundation-modules/
 │   └── terragrunt.stack.hcl  #   Declares environments + values
 ├── docs/                     # Decision docs with diagrams
 ├── root.hcl                  # Remote state (GCS) + provider config
-├── org.hcl                   # Billing, region, CI/CD SA
+├── org.hcl                   # Org ID, billing, region, CI/CD SA
 └── mise.toml                 # Tool version pinning
 ```
 
@@ -107,7 +111,7 @@ gcp-foundation-modules/
 
 | Doc | What it covers |
 |-----|---------------|
-| [Bootstrap](docs/BOOTSTRAP.md) | Chicken-and-egg problem, project structure, no-org decision |
+| [Bootstrap](docs/BOOTSTRAP.md) | Chicken-and-egg problem, project structure, organisation setup |
 | [Branching](docs/BRANCHING.md) | Trunk-based dev, branch naming, deployment flow |
 | [Terragrunt](docs/TERRAGRUNT.md) | Why Terragrunt over pure Terraform, how stacks work |
 | [CI Pipeline](docs/CI.md) | What each validation step does (tflint, checkov, etc.) |

@@ -38,7 +38,7 @@ inputs = {
     "storage.googleapis.com",
   ])
 
-  # Grant CI/CD SA access to every project (no GCP Org = per-project grants).
+  # Grant CI/CD SA access to every project.
   # The SA email comes from org.hcl, not from stack values, to avoid
   # GitHub Actions secret masking breaking the for_each keys.
   iam_additive = {
