@@ -138,7 +138,7 @@ jobs:
               ? content.substring(0, 60000) + '\n\n... truncated ...'
               : content;
 
-            const body = `## ${emoji} Terragrunt Plan (affected units only)\n\n**Status:** ${status}\n\n<details>\n<summary>Plan output</summary>\n\n\`\`\`\n${truncated}\n\`\`\`\n</details>`;
+            const body = `## ${emoji} Terragrunt Plan\n\n**Status:** ${status}\n\n<details>\n<summary>Plan output</summary>\n\n\`\`\`\n${truncated}\n\`\`\`\n</details>`;
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
