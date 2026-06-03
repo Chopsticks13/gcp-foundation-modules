@@ -1,0 +1,5 @@
+# Exclude unit templates from filter discovery.
+# Units use values.xxx which only exist after stack generation.
+# Without this, --filter tries to run them as standalone units and fails.
+# See: https://github.com/gruntwork-io/terragrunt/discussions/5882
+!./units/**
