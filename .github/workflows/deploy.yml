@@ -9,6 +9,11 @@ on:
       - 'live/**'
       - 'mise.toml'
   workflow_dispatch:
+    inputs:
+      confirm_full_apply:
+        description: 'Type "apply-all" to confirm a full, unfiltered stack apply'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -43,10 +48,15 @@ jobs:
           terragrunt stack generate
           terragrunt run --all --filter "[${{ github.event.before }}...HEAD]" --non-interactive -- apply -auto-approve
 
-      # Manual runs are an explicit "reconcile everything" escape hatch,
-      # with no prior commit to diff against.
+      # Manual runs are an explicit "reconcile everything" escape hatch, with
+      # no prior commit to diff against - require typed confirmation so a
+      # stray click can't trigger an unscoped apply across the whole stack.
       - name: Deploy (full stack)
         if: github.event_name == 'workflow_dispatch'
         run: |
+          if [ "${{ inputs.confirm_full_apply }}" != "apply-all" ]; then
+            echo "::error::confirm_full_apply must be exactly 'apply-all' to run a full-stack apply. Got: '${{ inputs.confirm_full_apply }}'"
+            exit 1
+          fi
           cd live
           terragrunt stack run --non-interactive -- apply -auto-approve
