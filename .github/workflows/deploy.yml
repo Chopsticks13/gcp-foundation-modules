@@ -7,6 +7,7 @@ on:
       - 'modules/**'
       - 'units/**'
       - 'live/**'
+      - 'mise.toml'
   workflow_dispatch:
 
 permissions:
@@ -21,6 +22,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install mise
         uses: jdx/mise-action@v2
@@ -31,7 +34,19 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Deploy
+      # Push events only apply units affected by what actually changed in
+      # this push, matching the scope pr-validation.yml already planned.
+      - name: Deploy (changed units only)
+        if: github.event_name == 'push'
+        run: |
+          cd live
+          terragrunt stack generate
+          terragrunt run --all --filter "[${{ github.event.before }}...HEAD]" --non-interactive -- apply -auto-approve
+
+      # Manual runs are an explicit "reconcile everything" escape hatch,
+      # with no prior commit to diff against.
+      - name: Deploy (full stack)
+        if: github.event_name == 'workflow_dispatch'
         run: |
           cd live
           terragrunt stack run --non-interactive -- apply -auto-approve
