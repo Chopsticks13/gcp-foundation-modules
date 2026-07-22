@@ -12,15 +12,6 @@ include "org" {
   expose = true
 }
 
-dependency "project" {
-  config_path = "../project"
-
-  mock_outputs = {
-    project_id = "mock-project-id"
-  }
-  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
-}
-
 inputs = {
   project_id    = dependency.project.outputs.project_id
   name          = values.bucket_name
