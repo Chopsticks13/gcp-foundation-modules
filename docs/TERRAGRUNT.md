@@ -18,9 +18,9 @@ one of the most respected infrastructure consultancies.
 
 With pure Terraform you'd have one of two bad options:
 
-**Option A: One giant Terraform root module**
+### Option A: One giant Terraform root module
 
-```
+```text
 # Everything in one state file
 resource "google_project" "dev" { ... }
 resource "google_project" "staging" { ... }
@@ -33,9 +33,9 @@ resource "google_storage_bucket" "staging" { ... }
 Problem: changing a dev bucket requires Terraform to evaluate your entire
 prod infrastructure too. One state file = one blast radius.
 
-**Option B: Copy-paste module calls per environment**
+### Option B: Copy-paste module calls per environment
 
-```
+```text
 environments/
 ├── dev/
 │   ├── main.tf      # module "project" { source = "../../modules/project" }
@@ -55,9 +55,9 @@ Problem: massive duplication. Backend config, provider config, and module
 wiring are copy-pasted everywhere. Adding a new module means editing every
 environment. Drift between environments is inevitable.
 
-**What Terragrunt gives you: DRY configuration**
+### What Terragrunt gives you: DRY configuration
 
-```
+```text
 root.hcl          # backend + provider config (written once)
 org.hcl           # shared values (written once)
 live/
@@ -109,11 +109,40 @@ flowchart TD
 Reusable by anyone, even without Terragrunt.
 
 **Units** — Terragrunt wrappers. Each unit sources a module, includes shared
-config (`root.hcl` for backend/provider, `org.hcl` for org values), declares
-dependencies on other units, and reads values passed from the stack.
+config (`root.hcl` for backend/provider, `org.hcl` for org values), and reads
+values passed from the stack. Dependencies on other units are wired in by the
+stack via `autoinclude` (see below), rather than hardcoded inside the unit.
 
 **Live** — the `terragrunt.stack.hcl` file that declares what actually exists.
 Each `unit` block says "deploy this unit at this path with these values."
+
+### Wiring dependencies with `autoinclude`
+
+Terragrunt 1.1 graduated **stack dependencies** out of experiment. Instead of
+a catalog unit hardcoding `dependency { config_path = "../project" }` (which
+assumes every stack names its project unit `project` and places it as a
+direct sibling), the stack declares the wiring itself, using `unit.<name>.path`
+to reference another unit's real generated path:
+
+```hcl
+# live/terragrunt.stack.hcl
+unit "dev_bucket" {
+  source = "../units/gcs"
+  path   = "dev/gcs"
+
+  autoinclude {
+    dependency "project" {
+      config_path = unit.dev_project.path
+    }
+  }
+}
+```
+
+Terragrunt generates a `terragrunt.autoinclude.hcl` next to the unit's
+`terragrunt.hcl`, merging the `dependency` block in automatically. This is
+how `units/gcs` and `units/iam-service-account` get their `project`
+dependency — the units themselves declare no dependency at all, so they stay
+portable across stacks with different layouts.
 
 ### How a Deploy Works
 
@@ -146,7 +175,7 @@ runs `terraform apply` on each unit in the correct order.
 
 When you run `terragrunt stack generate`, it creates:
 
-```
+```text
 live/.terragrunt-stack/
 ├── bootstrap/
 │   └── wif-github/
@@ -158,10 +187,12 @@ live/.terragrunt-stack/
 │   │   └── terragrunt.values.hcl
 │   ├── iam-service-account/
 │   │   ├── terragrunt.hcl
-│   │   └── terragrunt.values.hcl
+│   │   ├── terragrunt.values.hcl
+│   │   └── terragrunt.autoinclude.hcl  # injected dependency "project" block
 │   └── gcs/
 │       ├── terragrunt.hcl
-│       └── terragrunt.values.hcl
+│       ├── terragrunt.values.hcl
+│       └── terragrunt.autoinclude.hcl  # injected dependency "project" block
 ```
 
 This directory is gitignored — it's generated on demand, not committed.
@@ -171,6 +202,6 @@ This directory is gitignored — it's generated on demand, not committed.
 - [Terraform documentation](https://developer.hashicorp.com/terraform/docs)
 - [Terragrunt documentation](https://docs.terragrunt.com/)
 - [Terragrunt 1.0 release announcement](https://www.gruntwork.io/blog/terragrunt-1-0-released)
-- [Terragrunt Stacks: Explicit stacks](https://docs.terragrunt.com/features/stacks/explicit/)
+- [Terragrunt Stacks: Explicit stacks](https://docs.terragrunt.com/features/stacks/explicit/) (includes `autoinclude`/stack dependencies)
 - [Terragrunt Stack operations](https://docs.terragrunt.com/features/stacks/stack-operations/)
 - [Gruntwork: Terragrunt vs pure Terraform](https://docs.terragrunt.com/getting-started/overview/)
