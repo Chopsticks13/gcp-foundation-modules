@@ -39,6 +39,17 @@ unit "dev_service_account" {
     sa_display_name = "Ops Dev Deploy SA"
     sa_description  = "Service account for dev environment automation."
   }
+
+  autoinclude {
+    dependency "project" {
+      config_path = unit.dev_project.path
+
+      mock_outputs = {
+        project_id = "mock-project-id"
+      }
+      mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+    }
+  }
 }
 
 unit "dev_bucket" {
@@ -50,6 +61,17 @@ unit "dev_bucket" {
     bucket_name = "ops-dev-data-7x2"
     versioning  = true
   }
+
+  autoinclude {
+    dependency "project" {
+      config_path = unit.dev_project.path
+
+      mock_outputs = {
+        project_id = "mock-project-id"
+      }
+      mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+    }
+  }
 }
 
 unit "dev_logs_bucket" {
@@ -60,5 +82,16 @@ unit "dev_logs_bucket" {
     environment = "dev"
     bucket_name = "ops-dev-logs-7x2"
     versioning  = false
+  }
+
+  autoinclude {
+    dependency "project" {
+      config_path = unit.dev_project.path
+
+      mock_outputs = {
+        project_id = "mock-project-id"
+      }
+      mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+    }
   }
 }
