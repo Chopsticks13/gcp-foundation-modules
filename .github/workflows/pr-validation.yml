@@ -9,6 +9,7 @@ on:
       - 'modules/**'
       - 'units/**'
       - 'live/**'
+      - 'mise.toml'
 
 permissions:
   contents: read
