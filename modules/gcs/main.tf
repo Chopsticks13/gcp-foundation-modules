@@ -6,7 +6,7 @@ resource "google_storage_bucket" "bucket" {
   force_destroy = var.force_destroy
   labels        = var.labels
 
-  uniform_bucket_level_access = true
+  uniform_bucket_level_access = false
 
   versioning {
     enabled = var.versioning
