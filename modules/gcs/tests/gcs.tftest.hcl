@@ -54,11 +54,11 @@ run "with_lifecycle_rules" {
   variables {
     lifecycle_rules = [
       {
-        action = { type = "Delete" }
+        action    = { type = "Delete" }
         condition = { age = 90 }
       },
       {
-        action = { type = "SetStorageClass", storage_class = "COLDLINE" }
+        action    = { type = "SetStorageClass", storage_class = "COLDLINE" }
         condition = { age = 30 }
       }
     ]
