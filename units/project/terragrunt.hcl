@@ -47,5 +47,6 @@ inputs = {
     "roles/iam.serviceAccountAdmin"         = [include.org.locals.cicd_sa]
     "roles/storage.admin"                   = [include.org.locals.cicd_sa]
     "roles/resourcemanager.projectIamAdmin" = [include.org.locals.cicd_sa]
+    "roles/compute.networkAdmin"            = [include.org.locals.cicd_sa]
   }
 }
