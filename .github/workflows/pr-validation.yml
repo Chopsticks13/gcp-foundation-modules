@@ -33,10 +33,22 @@ jobs:
       - name: Validate Modules
         run: |
           for module in modules/*/; do
+            [ -f "$module/versions.tf" ] || continue
             echo "==> Validating $module"
             cd "$module"
             terraform init -backend=false
             terraform validate
+            cd - > /dev/null
+          done
+
+      - name: Test Modules
+        run: |
+          for module in modules/*/; do
+            [ -d "$module/tests" ] || continue
+            echo "==> Testing $module"
+            cd "$module"
+            terraform init -backend=false
+            terraform test
             cd - > /dev/null
           done
 
