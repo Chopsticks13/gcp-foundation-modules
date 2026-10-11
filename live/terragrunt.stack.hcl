@@ -95,3 +95,26 @@ unit "dev_logs_bucket" {
     }
   }
 }
+
+unit "dev_vpc" {
+  source = "../units/vpc"
+  path   = "dev/vpc"
+
+  values = {
+    environment  = "dev"
+    network_name = "vpc-dev"
+    subnet_name  = "subnet-dev"
+    subnet_cidr  = "10.0.0.0/24"
+  }
+
+  autoinclude {
+    dependency "project" {
+      config_path = unit.dev_project.path
+
+      mock_outputs = {
+        project_id = "mock-project-id"
+      }
+      mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+    }
+  }
+}
